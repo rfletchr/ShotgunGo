@@ -1,5 +1,5 @@
 # ShotgunGo
-A Shotgun REST API client for Go.
+A Shotgun REST API client for Go. This API is based on https://developers.shotgridsoftware.com/rest-api/ and was written with the assistance of Claude Code.
 
 ## Installation
 
