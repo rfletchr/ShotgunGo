@@ -14,46 +14,64 @@ type BatchRequest interface {
 }
 
 // CreateRequest creates a new entity record within a batch.
+// Use NewCreateRequest to construct one.
 type CreateRequest struct {
-	EntityType string
-	Data       map[string]any
+	entityType string
+	data       map[string]any
+}
+
+// NewCreateRequest returns a BatchRequest that creates a new entity record.
+func NewCreateRequest(entityType string, data map[string]any) CreateRequest {
+	return CreateRequest{entityType: entityType, data: data}
 }
 
 func (r CreateRequest) marshalBatchRequest() map[string]any {
 	return map[string]any{
 		"request_type": "create",
-		"entity":       r.EntityType,
-		"data":         r.Data,
+		"entity":       r.entityType,
+		"data":         r.data,
 	}
 }
 
 // UpdateRequest updates an existing entity record within a batch.
+// Use NewUpdateRequest to construct one.
 type UpdateRequest struct {
-	EntityType string
-	ID         int
-	Data       map[string]any
+	entityType string
+	id         int
+	data       map[string]any
+}
+
+// NewUpdateRequest returns a BatchRequest that updates an existing entity record.
+func NewUpdateRequest(entityType string, id int, data map[string]any) UpdateRequest {
+	return UpdateRequest{entityType: entityType, id: id, data: data}
 }
 
 func (r UpdateRequest) marshalBatchRequest() map[string]any {
 	return map[string]any{
 		"request_type": "update",
-		"entity":       r.EntityType,
-		"record_id":    r.ID,
-		"data":         r.Data,
+		"entity":       r.entityType,
+		"record_id":    r.id,
+		"data":         r.data,
 	}
 }
 
 // DeleteRequest deletes an entity record within a batch.
+// Use NewDeleteRequest to construct one.
 type DeleteRequest struct {
-	EntityType string
-	ID         int
+	entityType string
+	id         int
+}
+
+// NewDeleteRequest returns a BatchRequest that deletes an entity record.
+func NewDeleteRequest(entityType string, id int) DeleteRequest {
+	return DeleteRequest{entityType: entityType, id: id}
 }
 
 func (r DeleteRequest) marshalBatchRequest() map[string]any {
 	return map[string]any{
 		"request_type": "delete",
-		"entity":       r.EntityType,
-		"record_id":    r.ID,
+		"entity":       r.entityType,
+		"record_id":    r.id,
 	}
 }
 

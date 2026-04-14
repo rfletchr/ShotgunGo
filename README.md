@@ -60,11 +60,11 @@ func main() {
             "entity.Shot.code",
         ),
         sg.And(
-            sg.Filter("project.Project.archived", "is", false),
-            sg.Filter("project.Project.is_demo", "is", false),
+            sg.Filter("project.Project.archived", sg.Is, false),
+            sg.Filter("project.Project.is_demo", sg.Is, false),
             sg.Or(
-                sg.Filter("sg_status_list", "is", "ip"),
-                sg.Filter("sg_status_list", "is", "rdy"),
+                sg.Filter("sg_status_list", sg.Is, "ip"),
+                sg.Filter("sg_status_list", sg.Is, "rdy"),
             ),
         ),
     )
@@ -117,7 +117,7 @@ Returns an immutable `*Query`. No network call is made at this point.
 | Function                            | Description                                                  |
 |-------------------------------------|--------------------------------------------------------------|
 | `sg.Fields("f1", "f2", ...)`        | Fields to return, including deep links (`entity.Shot.code`)  |
-| `sg.Filter(field, relation, value)` | Single filter condition                                      |
+| `sg.Filter(field, relation, value)` | Single filter condition; `relation` is a `sg.FilterRelation` constant |
 | `sg.And(conditions...)`             | All conditions must match                                    |
 | `sg.Or(conditions...)`              | Any condition must match                                     |
 | `sg.PageSize(n)`                    | Override the default page size (500)                         |
@@ -210,14 +210,14 @@ Results are returned in the same order as the requests. Delete operations produc
 
 ```go
 results, err := client.Batch(ctx,
-    sg.CreateRequest{EntityType: "tasks", Data: map[string]any{
+    sg.NewCreateRequest("tasks", map[string]any{
         "content": "Animation",
         "project": map[string]any{"type": "Project", "id": 123},
-    }},
-    sg.UpdateRequest{EntityType: "tasks", ID: 456, Data: map[string]any{
+    }),
+    sg.NewUpdateRequest("tasks", 456, map[string]any{
         "sg_status_list": "ip",
-    }},
-    sg.DeleteRequest{EntityType: "tasks", ID: 789},
+    }),
+    sg.NewDeleteRequest("tasks", 789),
 )
 ```
 

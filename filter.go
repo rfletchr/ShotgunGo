@@ -38,16 +38,53 @@ type Condition interface {
 	marshalCondition() any
 }
 
+// FilterRelation is the comparison operator used in a Filter condition.
+// Using the typed constants prevents typos that would silently send an
+// invalid operator to the API.
+type FilterRelation string
+
+const (
+	Is             FilterRelation = "is"
+	IsNot          FilterRelation = "is_not"
+	LessThan       FilterRelation = "less_than"
+	GreaterThan    FilterRelation = "greater_than"
+	Contains       FilterRelation = "contains"
+	NotContains    FilterRelation = "not_contains"
+	StartsWith     FilterRelation = "starts_with"
+	EndsWith       FilterRelation = "ends_with"
+	Between        FilterRelation = "between"
+	NotBetween     FilterRelation = "not_between"
+	InLast         FilterRelation = "in_last"
+	NotInLast      FilterRelation = "not_in_last"
+	InNext         FilterRelation = "in_next"
+	NotInNext      FilterRelation = "not_in_next"
+	InCalendarDay  FilterRelation = "in_calendar_day"
+	InCalendarWeek FilterRelation = "in_calendar_week"
+	InCalendarMonth FilterRelation = "in_calendar_month"
+	InCalendarYear FilterRelation = "in_calendar_year"
+	In             FilterRelation = "in"
+	NotIn          FilterRelation = "not_in"
+	TypeIs         FilterRelation = "type_is"
+	TypeIsNot      FilterRelation = "type_is_not"
+	InGroup        FilterRelation = "in_group"
+	NotInGroup     FilterRelation = "not_in_group"
+	AddressIs      FilterRelation = "address_is"
+	NameContains   FilterRelation = "name_contains"
+	NameNotContains FilterRelation = "name_not_contains"
+	NameStartsWith FilterRelation = "name_starts_with"
+	NameEndsWith   FilterRelation = "name_ends_with"
+)
+
 // leafCondition is a single filter triple: [field, relation, value].
 type leafCondition struct {
 	field    string
-	relation string
+	relation FilterRelation
 	value    any
 }
 
-func (c leafCondition) applyTo(cfg *queryConfig)  { cfg.condition = c }
+func (c leafCondition) applyTo(cfg *queryConfig) { cfg.condition = c }
 func (c leafCondition) marshalCondition() any {
-	return []any{c.field, c.relation, c.value}
+	return []any{c.field, string(c.relation), c.value}
 }
 
 // logicalCondition groups conditions with "and" or "or".
@@ -69,7 +106,7 @@ func (c logicalCondition) marshalCondition() any {
 }
 
 // Filter returns a leaf Condition: [field, relation, value].
-func Filter(field, relation string, value any) Condition {
+func Filter(field string, relation FilterRelation, value any) Condition {
 	return leafCondition{field: field, relation: relation, value: value}
 }
 
