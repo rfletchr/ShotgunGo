@@ -152,6 +152,16 @@ entity.Type       // e.g. "Task"
 entity.Decode(&v) // unmarshal the full record into a typed struct
 ```
 
+### NewEntityRef
+
+```go
+ref := sg.NewEntityRef(entityType, id)
+```
+
+Returns a relationship reference (`map[string]any{"type": entityType, "id": id}`) for use as a field value in `Create`, `Update`, and `Batch` requests.
+
+> **Note:** `entityType` must be the singular PascalCase name used by the REST API for relationship objects (e.g. `"Project"`, `"Task"`, `"HumanUser"`) — **not** the plural snake_case name used for endpoint paths (e.g. `"projects"`, `"tasks"`).
+
 ### Create
 
 ```go
@@ -159,13 +169,13 @@ entity, err := client.Create(ctx, entityType, fields)
 ```
 
 Creates a new record. `fields` is a flat `map[string]any` of field names to values.
-Relationship fields are set by passing an object with `id` and `type`:
+Relationship fields are set using `NewEntityRef`:
 
 ```go
 entity, err := client.Create(ctx, "tasks", map[string]any{
     "content":        "Animation",
     "sg_status_list": "rdy",
-    "project":        map[string]any{"id": 123, "type": "Project"},
+    "project":        sg.NewEntityRef("Project", 123),
 })
 ```
 
@@ -212,7 +222,7 @@ Results are returned in the same order as the requests. Delete operations produc
 results, err := client.Batch(ctx,
     sg.NewCreateRequest("tasks", map[string]any{
         "content": "Animation",
-        "project": map[string]any{"type": "Project", "id": 123},
+        "project": sg.NewEntityRef("Project", 123),
     }),
     sg.NewUpdateRequest("tasks", 456, map[string]any{
         "sg_status_list": "ip",
@@ -238,7 +248,7 @@ err := client.UploadFile(ctx, "versions", 123, "", "/path/to/notes.pdf", "applic
 
 ```go
 version, err := client.Create(ctx, "versions", map[string]any{
-    "project":          map[string]any{"type": "Project", "id": 123},
+    "project":          sg.NewEntityRef("Project", 123),
     "code":             "sc010_sh020_anim_v001.mov",
     "sg_path_to_movie": "/path/to/sc010_sh020_anim_v001.mov",
 })

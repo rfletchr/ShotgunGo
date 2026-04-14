@@ -11,6 +11,16 @@ type Entity struct {
 	raw  json.RawMessage
 }
 
+// NewEntityRef returns a relationship reference map suitable for use as a field
+// value in Create, Update, and Batch requests.
+//
+// Note: entityType must be the singular PascalCase name used by the REST API
+// for relationship objects (e.g. "Project", "Task", "HumanUser") — NOT the
+// plural snake_case name used for endpoint paths (e.g. "projects", "tasks").
+func NewEntityRef(entityType string, id int) map[string]any {
+	return map[string]any{"type": entityType, "id": id}
+}
+
 // Decode unmarshals the full entity JSON into v using standard json struct tags.
 // The target struct should mirror the entity envelope:
 //
