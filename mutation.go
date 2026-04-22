@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -43,8 +44,9 @@ func (c *Client) Create(ctx context.Context, entityType string, fields map[strin
 		return Entity{}, err
 	}
 	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		return Entity{}, fmt.Errorf("create %s failed with status %d", entityType, resp.StatusCode)
+		return Entity{}, fmt.Errorf("create %s failed with status %d: %s", entityType, resp.StatusCode, body)
 	}
 	return decodeEntityResponse(resp)
 }
@@ -59,8 +61,9 @@ func (c *Client) Update(ctx context.Context, entityType string, id int, fields m
 		return Entity{}, err
 	}
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		return Entity{}, fmt.Errorf("update %s/%d failed with status %d", entityType, id, resp.StatusCode)
+		return Entity{}, fmt.Errorf("update %s/%d failed with status %d: %s", entityType, id, resp.StatusCode, body)
 	}
 	return decodeEntityResponse(resp)
 }
