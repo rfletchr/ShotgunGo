@@ -219,5 +219,6 @@ func (c *Client) Find(entityType string, options ...QueryOption) *Query {
 		fields:     cfg.fields,
 		condition:  cfg.condition,
 		pageSize:   cfg.pageSize,
+		order:      cfg.order,
 	}
 }

@@ -10,6 +10,7 @@ type queryConfig struct {
 	fields    []string
 	condition Condition
 	pageSize  int
+	order     []OrderField
 }
 
 // fieldsOption sets the fields to return.

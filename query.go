@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 // Query describes a search against a Shotgun entity type.
@@ -18,6 +19,7 @@ type Query struct {
 	fields     []string
 	condition  Condition
 	pageSize   int
+	order      []OrderField
 }
 
 // pageResponse mirrors the top-level JSON envelope for a _search response.
@@ -26,11 +28,22 @@ type pageResponse struct {
 	Links pageLinks         `json:"links"`
 }
 
-// searchURL builds the _search path with page query parameters.
+// searchURL builds the _search path with page and sort query parameters.
 func (q *Query) searchURL(pageNumber, pageSize int) string {
 	params := url.Values{}
 	params.Set("page[number]", strconv.Itoa(pageNumber))
 	params.Set("page[size]", strconv.Itoa(pageSize))
+	if len(q.order) > 0 {
+		parts := make([]string, len(q.order))
+		for i, o := range q.order {
+			if o.Direction == Desc {
+				parts[i] = "-" + o.Field
+			} else {
+				parts[i] = o.Field
+			}
+		}
+		params.Set("sort", strings.Join(parts, ","))
+	}
 	return fmt.Sprintf("/api/v1.1/entity/%s/_search?%s", q.entityType, params.Encode())
 }
 

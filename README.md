@@ -1,5 +1,6 @@
 # ShotgunGo
-A Shotgun REST API client for Go. This API is based on https://developers.shotgridsoftware.com/rest-api/ and was written with the assistance of Claude Code.
+
+A ShotGrid REST API client for Go, based on the [Flow Production Tracking REST API](https://developers.shotgridsoftware.com/rest-api/). Written with the assistance of Claude Code.
 
 ## Installation
 
@@ -21,8 +22,10 @@ import (
 )
 
 type TaskAttributes struct {
-    Content string `json:"content"`
-    Status  string `json:"sg_status_list"`
+    Content     string `json:"content"`
+    Status      string `json:"sg_status_list"`
+    ProjectName string `json:"project.Project.tank_name"`
+    ShotCode    string `json:"entity.Shot.code"`
 }
 
 type EntityRef struct {
@@ -51,25 +54,18 @@ func main() {
 
     ctx := context.Background()
 
-    // Build a query — this does not hit the network.
-    q := client.Find("tasks",
-        sg.Fields(
-            "content",
-            "sg_status_list",
-            "project.Project.tank_name",
-            "entity.Shot.code",
-        ),
+    q := client.Find("Task",
+        sg.Fields("content", "sg_status_list", "project.Project.tank_name", "entity.Shot.code"),
         sg.And(
             sg.Filter("project.Project.archived", sg.Is, false),
-            sg.Filter("project.Project.is_demo", sg.Is, false),
             sg.Or(
                 sg.Filter("sg_status_list", sg.Is, "ip"),
                 sg.Filter("sg_status_list", sg.Is, "rdy"),
             ),
         ),
+        sg.Order(sg.OrderField{Field: "created_at", Direction: sg.Desc}),
     )
 
-    // Iterate over all results, fetching pages on demand.
     for entity, err := range q.Iter(ctx) {
         if err != nil {
             log.Fatal(err)
@@ -87,14 +83,16 @@ func main() {
 
 ### Entity type names
 
-The REST API uses **plural snake_case** for entity types, which differs from the Python API's singular PascalCase:
+Entity types can be passed in either PascalCase or plural snake_case — the API accepts both. PascalCase is recommended as it is consistent with schema responses and relationship objects.
 
-| Python API    | REST API       |
-|---------------|----------------|
-| `Task`        | `tasks`        |
-| `Project`     | `projects`     |
-| `HumanUser`   | `human_users`  |
-| `CustomEntity01` | `custom_entity_01s` |
+| PascalCase (recommended) | Plural snake_case     |
+|--------------------------|-----------------------|
+| `Task`                   | `tasks`               |
+| `Project`                | `projects`            |
+| `HumanUser`              | `human_users`         |
+| `CustomEntity01`         | `custom_entity_01s`   |
+
+---
 
 ### Client
 
@@ -102,7 +100,9 @@ The REST API uses **plural snake_case** for entity types, which differs from the
 client := sg.NewClient(baseURL, scriptName, scriptKey)
 ```
 
-Authenticates using Shotgun script credentials. Tokens are refreshed automatically.
+Authenticates using ShotGrid script credentials. Tokens are refreshed automatically.
+
+---
 
 ### Find
 
@@ -114,22 +114,41 @@ Returns an immutable `*Query`. No network call is made at this point.
 
 **Options:**
 
-| Function                            | Description                                                  |
-|-------------------------------------|--------------------------------------------------------------|
-| `sg.Fields("f1", "f2", ...)`        | Fields to return, including deep links (`entity.Shot.code`)  |
-| `sg.Filter(field, relation, value)` | Single filter condition; `relation` is a `sg.FilterRelation` constant |
-| `sg.And(conditions...)`             | All conditions must match                                    |
-| `sg.Or(conditions...)`              | Any condition must match                                     |
-| `sg.PageSize(n)`                    | Override the default page size (500)                         |
+| Function | Description |
+|----------|-------------|
+| `sg.Fields("f1", "f2", ...)` | Fields to return, including deep links (`entity.Shot.code`) |
+| `sg.Filter(field, relation, value)` | Single filter condition |
+| `sg.And(conditions...)` | All conditions must match |
+| `sg.Or(conditions...)` | Any condition must match |
+| `sg.PageSize(n)` | Override the default page size (500) |
+| `sg.Order(fields...)` | Sort by one or more fields |
+
+**Filter relations** are typed constants on `sg.FilterRelation`:
+`Is`, `IsNot`, `LessThan`, `GreaterThan`, `Contains`, `NotContains`, `StartsWith`,
+`EndsWith`, `Between`, `NotBetween`, `In`, `NotIn`, `InLast`, `NotInLast`,
+`InNext`, `NotInNext`, `InCalendarDay`, `InCalendarWeek`, `InCalendarMonth`,
+`InCalendarYear`, `TypeIs`, `TypeIsNot`, `NameContains`, `NameNotContains`,
+`NameStartsWith`, `NameEndsWith`.
+
+**Ordering:**
+
+```go
+sg.Order(
+    sg.OrderField{Field: "created_at", Direction: sg.Desc},
+    sg.OrderField{Field: "code",       Direction: sg.Asc},
+)
+```
+
+`sg.Asc` and `sg.Desc` are the only valid `OrderDirection` values.
 
 ### Query methods
 
 ```go
-entity, err := q.One(ctx)             // first result, or nil
-entities, err := q.All(ctx)           // all results, walking pages
-page, err := q.Page(ctx, 1)           // fetch a specific page (1-indexed)
+entity, err := q.One(ctx)                  // first result, or nil
+entities, err := q.All(ctx)                // all results, walking pages
+page, err := q.Page(ctx, 1)               // fetch a specific page (1-indexed)
 
-for entity, err := range q.Iter(ctx) { // range-over iterator, pages on demand
+for entity, err := range q.Iter(ctx) {    // range-over iterator, pages on demand
     ...
 }
 ```
@@ -152,15 +171,54 @@ entity.Type       // e.g. "Task"
 entity.Decode(&v) // unmarshal the full record into a typed struct
 ```
 
-### NewEntityRef
+---
+
+### Schema
 
 ```go
-ref := sg.NewEntityRef(entityType, id)
+// All entity types visible in the instance.
+types, err := client.EntityTypes(ctx)
+
+// Entity types in the context of a specific project.
+types, err := client.EntityTypes(ctx, projectID)
 ```
 
-Returns a relationship reference (`map[string]any{"type": entityType, "id": id}`) for use as a field value in `Create`, `Update`, and `Batch` requests.
+Returns `map[string]EntityType` keyed by PascalCase type name.
 
-> **Note:** `entityType` must be the singular PascalCase name used by the REST API for relationship objects (e.g. `"Project"`, `"Task"`, `"HumanUser"`) — **not** the plural snake_case name used for endpoint paths (e.g. `"projects"`, `"tasks"`).
+```go
+type EntityType struct {
+    Name    string
+    Label   string
+    Visible bool
+}
+```
+
+```go
+// All fields for an entity type.
+fields, err := client.Fields(ctx, "Shot")
+
+// Fields in the context of a specific project — required for accurate
+// status values and other project-configured field properties.
+fields, err := client.Fields(ctx, "Shot", projectID)
+```
+
+Returns `map[string]SchemaField` keyed by field name.
+
+```go
+type SchemaField struct {
+    Name        string
+    Label       string
+    Description string
+    DataType    string
+    Editable    bool
+    Mandatory   bool
+    Visible     bool
+    ValidValues []string // populated for list and status_list fields
+    ValidTypes  []string // populated for entity and multi_entity fields
+}
+```
+
+---
 
 ### Create
 
@@ -168,18 +226,15 @@ Returns a relationship reference (`map[string]any{"type": entityType, "id": id}`
 entity, err := client.Create(ctx, entityType, fields)
 ```
 
-Creates a new record. `fields` is a flat `map[string]any` of field names to values.
-Relationship fields are set using `NewEntityRef`:
+`fields` is a flat `map[string]any`. Relationship fields use `NewEntityRef`:
 
 ```go
-entity, err := client.Create(ctx, "tasks", map[string]any{
+entity, err := client.Create(ctx, "Task", map[string]any{
     "content":        "Animation",
     "sg_status_list": "rdy",
     "project":        sg.NewEntityRef("Project", 123),
 })
 ```
-
-Returns the created `Entity`. Call `Decode` on it to get a typed struct.
 
 ### Update
 
@@ -187,15 +242,13 @@ Returns the created `Entity`. Call `Decode` on it to get a typed struct.
 entity, err := client.Update(ctx, entityType, id, fields)
 ```
 
-Updates an existing record. Only the fields present in the map are changed — unspecified fields are left untouched.
+Only fields present in the map are changed.
 
 ```go
-entity, err := client.Update(ctx, "tasks", 456, map[string]any{
+entity, err := client.Update(ctx, "Task", 456, map[string]any{
     "sg_status_list": "ip",
 })
 ```
-
-Returns the updated `Entity`.
 
 ### Delete
 
@@ -203,11 +256,16 @@ Returns the updated `Entity`.
 err := client.Delete(ctx, entityType, id)
 ```
 
-Deletes a record. Returns `nil` on success, an error otherwise.
+### NewEntityRef
 
 ```go
-err := client.Delete(ctx, "tasks", 456)
+ref := sg.NewEntityRef("Project", 123)
+// returns map[string]any{"type": "Project", "id": 123}
 ```
+
+Use as a field value in `Create`, `Update`, and `Batch` requests.
+
+---
 
 ### Batch
 
@@ -215,133 +273,84 @@ err := client.Delete(ctx, "tasks", 456)
 results, err := client.Batch(ctx, requests...)
 ```
 
-Executes multiple create, update, and delete operations in a single request.
-Results are returned in the same order as the requests. Delete operations produce a zero-valued `Entity` in the result slice.
+Executes multiple operations in a single request. Results are returned in the same order as the requests. Delete operations produce a zero-valued `Entity` in the result slice.
 
 ```go
 results, err := client.Batch(ctx,
-    sg.NewCreateRequest("tasks", map[string]any{
+    sg.NewCreateRequest("Task", map[string]any{
         "content": "Animation",
         "project": sg.NewEntityRef("Project", 123),
     }),
-    sg.NewUpdateRequest("tasks", 456, map[string]any{
+    sg.NewUpdateRequest("Task", 456, map[string]any{
         "sg_status_list": "ip",
     }),
-    sg.NewDeleteRequest("tasks", 789),
+    sg.NewDeleteRequest("Task", 789),
 )
 ```
+
+---
 
 ### Upload
 
 ```go
-// Upload from a file path — multipart is used automatically for files > 5MB.
+// Upload from a file path — multipart used automatically for files > 5MB.
 err := client.UploadFile(ctx, entityType, id, field, filePath, contentType)
 
-// Upload from any io.Reader when you already have the data in memory or a stream.
+// Upload from any io.Reader.
 err := client.Upload(ctx, entityType, id, field, filename, contentType, r, size)
-
-// Upload as a linked Attachment rather than into a specific field.
-err := client.UploadFile(ctx, "versions", 123, "", "/path/to/notes.pdf", "application/pdf")
 ```
 
 **Creating a Version and uploading a movie:**
 
 ```go
-version, err := client.Create(ctx, "versions", map[string]any{
-    "project":          sg.NewEntityRef("Project", 123),
-    "code":             "sc010_sh020_anim_v001.mov",
-    "sg_path_to_movie": "/path/to/sc010_sh020_anim_v001.mov",
+version, err := client.Create(ctx, "Version", map[string]any{
+    "project": sg.NewEntityRef("Project", 123),
+    "code":    "sc010_sh020_anim_v001",
 })
-if err != nil {
-    log.Fatal(err)
-}
-
-err = client.UploadFile(ctx, "versions", version.ID, "sg_uploaded_movie",
+err = client.UploadFile(ctx, "Version", version.ID, "sg_uploaded_movie",
     "/path/to/sc010_sh020_anim_v001.mov", "video/quicktime")
 ```
 
 ### Download
 
 ```go
-// Download a file field to disk.
 err := client.DownloadFile(ctx, entityType, id, field, filePath)
-
-// Stream a file field to any io.Writer.
 err := client.Download(ctx, entityType, id, field, w)
 
-// Download the image/thumbnail field to disk.
+// thumbnail: true for thumbnail, false for original image
 err := client.DownloadImageFile(ctx, entityType, id, thumbnail, filePath)
-
-// Stream the image/thumbnail field to any io.Writer.
 err := client.DownloadImage(ctx, entityType, id, thumbnail, w)
 ```
 
-```go
-// Download a version's uploaded movie.
-err := client.DownloadFile(ctx, "versions", 123, "sg_uploaded_movie", "./cut.mov")
-
-// Download an asset's thumbnail.
-err := client.DownloadImageFile(ctx, "assets", 456, true, "./thumb.jpg")
-
-// Download the original image.
-err := client.DownloadImageFile(ctx, "assets", 456, false, "./image.jpg")
-```
+---
 
 ## Unmarshalling into typed structs
 
-`Entity.Decode` unmarshals the original response JSON into any struct using standard `json` tags.
-Define a struct that mirrors the entity envelope:
-
-- `id` and `type` sit at the top level
-- requested fields are nested under `attributes` — deep-linked fields (e.g. `project.Project.tank_name`) come back as flat keys using the same dot-notation string
-- related entity references are nested under `relationships`, each with a `data` array
+`Entity.Decode` unmarshals the response JSON into any struct using standard `json` tags.
+Fields are nested under `attributes`; deep-linked fields come back as flat keys using
+the same dot-notation string passed to `sg.Fields`.
 
 ```go
-type EntityRef struct {
-    ID   int    `json:"id"`
-    Type string `json:"type"`
-}
-
 type TaskAttributes struct {
-    Content      string `json:"content"`
-    Status       string `json:"sg_status_list"`
-    UpdatedAt    string `json:"updated_at"`
-    // Deep-linked fields use the same dot-notation passed to sg.Fields(...)
-    ProjectName  string `json:"project.Project.tank_name"`
-    ShotCode     string `json:"entity.Shot.code"`
-    SequenceCode string `json:"entity.Shot.sg_sequence.Sequence.code"`
+    Content     string `json:"content"`
+    Status      string `json:"sg_status_list"`
+    ProjectName string `json:"project.Project.tank_name"`
+    ShotCode    string `json:"entity.Shot.code"`
 }
 
 type TaskAssignees struct {
-    Data []EntityRef `json:"data"`
-}
-
-type TaskRelationships struct {
-    TaskAssignees TaskAssignees `json:"task_assignees"`
+    Data []struct {
+        ID   int    `json:"id"`
+        Type string `json:"type"`
+    } `json:"data"`
 }
 
 type Task struct {
-    ID            int               `json:"id"`
-    Type          string            `json:"type"`
-    Attributes    TaskAttributes    `json:"attributes"`
-    Relationships TaskRelationships `json:"relationships"`
-}
-```
-
-Then decode inline:
-
-```go
-for entity, err := range q.Iter(ctx) {
-    if err != nil {
-        log.Fatal(err)
-    }
-    var task Task
-    if err := entity.Decode(&task); err != nil {
-        log.Fatal(err)
-    }
-    fmt.Println(task.ID, task.Attributes.Content, task.Attributes.Status)
-    for _, assignee := range task.Relationships.TaskAssignees.Data {
-        fmt.Println("  assignee id:", assignee.ID)
-    }
+    ID         int            `json:"id"`
+    Type       string         `json:"type"`
+    Attributes TaskAttributes `json:"attributes"`
+    Relationships struct {
+        TaskAssignees TaskAssignees `json:"task_assignees"`
+    } `json:"relationships"`
 }
 ```
