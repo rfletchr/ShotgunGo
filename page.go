@@ -10,12 +10,18 @@ type pageLinks struct {
 	Prev string `json:"prev"`
 }
 
+// pageFetcher is implemented by any query type that can re-fetch a page by URL.
+// The rawURL is the next/prev link returned by the API.
+type pageFetcher interface {
+	fetchPage(ctx context.Context, rawURL string) (*Page, error)
+}
+
 // Page holds a single page of Entity results along with enough state to
 // navigate to adjacent pages.
 type Page struct {
 	Entities []Entity
 	links    pageLinks
-	query    *Query
+	fetcher  pageFetcher
 }
 
 // HasNext reports whether there is a subsequent page of results.
@@ -33,7 +39,7 @@ func (p *Page) Next(ctx context.Context) (*Page, error) {
 	if !p.HasNext() {
 		return nil, nil
 	}
-	return p.query.fetchPage(ctx, p.links.Next)
+	return p.fetcher.fetchPage(ctx, p.links.Next)
 }
 
 // Prev fetches the previous page. It returns nil, nil when already on the first page.
@@ -41,5 +47,5 @@ func (p *Page) Prev(ctx context.Context) (*Page, error) {
 	if !p.HasPrev() {
 		return nil, nil
 	}
-	return p.query.fetchPage(ctx, p.links.Prev)
+	return p.fetcher.fetchPage(ctx, p.links.Prev)
 }

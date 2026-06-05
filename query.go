@@ -84,7 +84,7 @@ func (q *Query) fetchPage(ctx context.Context, rawURL string) (*Page, error) {
 	return &Page{
 		Entities: entities,
 		links:    raw.Links,
-		query:    q,
+		fetcher:  q,
 	}, nil
 }
 

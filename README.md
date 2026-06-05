@@ -85,14 +85,14 @@ func main() {
 
 Entity types can be passed in either PascalCase or plural snake_case — the API accepts both. PascalCase is recommended as it is consistent with schema responses and relationship objects.
 
-| PascalCase (recommended) | Plural snake_case     |
+| PascalCase (recommended) | Plural snake_case |
 |--------------------------|-----------------------|
-| `Task`                   | `tasks`               |
-| `Project`                | `projects`            |
-| `HumanUser`              | `human_users`         |
-| `CustomEntity01`         | `custom_entity_01s`   |
+| `Task` | `tasks` |
+| `Project` | `projects` |
+| `HumanUser` | `human_users` |
+| `CustomEntity01` | `custom_entity_01s` |
 
----
+______________________________________________________________________
 
 ### Client
 
@@ -102,7 +102,7 @@ client := sg.NewClient(baseURL, scriptName, scriptKey)
 
 Authenticates using ShotGrid script credentials. Tokens are refreshed automatically.
 
----
+______________________________________________________________________
 
 ### Find
 
@@ -171,7 +171,7 @@ entity.Type       // e.g. "Task"
 entity.Decode(&v) // unmarshal the full record into a typed struct
 ```
 
----
+______________________________________________________________________
 
 ### Schema
 
@@ -218,7 +218,7 @@ type SchemaField struct {
 }
 ```
 
----
+______________________________________________________________________
 
 ### Create
 
@@ -265,7 +265,7 @@ ref := sg.NewEntityRef("Project", 123)
 
 Use as a field value in `Create`, `Update`, and `Batch` requests.
 
----
+______________________________________________________________________
 
 ### Batch
 
@@ -288,7 +288,7 @@ results, err := client.Batch(ctx,
 )
 ```
 
----
+______________________________________________________________________
 
 ### Upload
 
@@ -322,7 +322,7 @@ err := client.DownloadImageFile(ctx, entityType, id, thumbnail, filePath)
 err := client.DownloadImage(ctx, entityType, id, thumbnail, w)
 ```
 
----
+______________________________________________________________________
 
 ## Unmarshalling into typed structs
 
